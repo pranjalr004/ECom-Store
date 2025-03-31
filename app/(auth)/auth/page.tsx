@@ -1,27 +1,100 @@
 'use client'
-import React from 'react'
+import React, { FormEvent, useEffect } from 'react'
 import {motion,AnimatePresence} from "framer-motion"
 import { useState } from 'react'
 import { useSearchParams,useRouter } from 'next/navigation'
-import {ChevronLeft, Facebook, Instagram, Key, ShoppingBag, Star} from "lucide-react"
+import {ChevronLeft, Facebook, Instagram, Key, Loader2, ShoppingBag, Star} from "lucide-react"
 import { Button } from '@/components/ui/button'
-import { div } from 'framer-motion/client'
+import { getSignupFormData, handleSignupSubmit } from '@/actions/auth/signup'
+import { getSigninFormData } from '@/actions/auth/login'
+import { IAttributes } from 'oneentry/dist/base/utils'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+
+import {toast} from 'sonner'
+
+
+interface SignupFormData{
+  "email-live":string,
+  "password-live":string,
+  "name-live":string;
+}
+
+interface LoginFormData{
+  "email-live":string;
+  "password-live":string;
+}
+
+
 const Auth = () => {
   const [isSignup, setisSignup] = useState(true)
   const [isLoading,setIsLoading]=useState(true)
   const [isSubmitting,setIsSubmitting]=useState(false)
-  const [inputValues,setInputValues]=useState({})
-  const [error,setError]=useState(null)
-
+  const [inputValues,setInputValues]=useState<Partial<SignupFormData & LoginFormData>>({})
+  const [error,setError]=useState<string | null>(null)
+  const [formData,setFormData]=useState<IAttributes[]>([])
 
 
   const router=useRouter();
   const searchParams=useSearchParams();
 
+  useEffect(()=>{
+    const type=searchParams.get("type")
+    setisSignup(type !=="login")
+  },[searchParams])
+
+  useEffect(()=>{
+    setIsLoading(true)
+    setError(null)
+    const fetchData=isSignup ? getSignupFormData : getSigninFormData
+    fetchData().then((data)=>setFormData(data)).catch(()=>setError("Failed to load form data.Please try Again")).finally(()=>setIsLoading(false))
+    console.log({formData})
+  },[isSignup])
+
+
   const toggleForm=()=>{
     setisSignup(!isSignup)
     setError(null)
     setInputValues({})
+  }
+
+  const handleInputChange=(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const {name,value}=e.target;
+    setInputValues((prevValues)=>({...prevValues,[name]:value}))
+  }
+
+  const handleSubmit=async(e:FormEvent)=>{
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError(null)
+
+    try{
+      if(isSignup){
+        if(inputValues["email-live"] && inputValues["password-live"] && inputValues["name-live"]){
+          const response=await handleSignupSubmit(inputValues as SignupFormData)
+          if("identifier" in response){
+            setInputValues({})
+            setisSignup(false)
+            
+          }else{
+            setError(response.message)
+          }
+        }
+        else{
+          setError("Please fill out all required fields")
+        }
+      }
+      else{
+
+      }
+    }
+    catch(error){
+      setError(error instanceof Error ?error.message : "An error occured. Please try again")
+    }
+    finally{
+      setIsSubmitting(false)
+    }
+
   }
 
   return (
@@ -51,6 +124,67 @@ const Auth = () => {
             }
           </p>
         </motion.div>
+        {
+          isLoading ? ( 
+          <div className='flex justify-center items-center h-64'>
+            <Loader2 className='h-8 w-8 animate-spin text-[#00FFFF]'/>
+          </div>
+          ) : (
+            <form className='space-y-4 sm:space-y-6' onSubmit={handleSubmit}>
+              {formData?.map((field:IAttributes)=>(
+                <motion.div
+                key={field.marker}
+                initial={{opacity:0,y:20}}
+                animate={{opacity:1,y:0}}
+                transition={{delay:0.3}}
+                >
+                  <Label className='text-base sm:text-lg text-gray-400 mb-1 sm:mb-2 block' htmlFor={field.marker}
+                  >
+                    {field.localizeInfos.title}
+                  </Label>
+                  <Input
+                  id={field.marker}
+                  type={field.marker==="password-live" ? "password" : "text"}
+                  name={field.marker}
+                  className='bg-gray-800 border-gray-700 text-white text-base sm:text-lg p-4 sm:p-6' placeholder={field.localizeInfos.title}
+                  value={
+                    inputValues[field.marker as keyof typeof inputValues] || ""
+                  }
+                  disabled={isSubmitting}
+                  onChange={handleInputChange}
+                  />
+                </motion.div>
+              ))}
+              {error && (
+                <motion.div
+                initial={{opacity:0,y:-10}}
+                animate={{opacity:1,y:0}}
+                className='text-red-500 text mt-2 text-center'
+                >
+                  {error}
+                </motion.div>
+              )}
+              <motion.div
+              initial={{opacity:0,y:20}}
+              animate={{opacity:1,y:0}}
+              transition={{delay:0.6}}
+              >
+                <Button
+                className='w-full bg-[#00FFFF] hover:bg-[#00CCCC] text-black text-base sm:text-xl font-bold p-4 sm:p-6'
+                disabled={isSubmitting}
+                >
+                  {
+                    isSubmitting ? (
+                      <Loader2 className='h-5 w-5 sm:h-6 sm:w-6 animate-spin'/>
+                    ) : isSignup ? (
+                      "Sign Up"
+                    ) : (
+                      "Sign In"
+                    )}
+                </Button>
+              </motion.div>
+            </form>
+        )}
         <motion.div className='mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-x-4' initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.7}}>
           <div className="text-base sm:text-lg lg:text-xl text-gray-400">
             Or continue with

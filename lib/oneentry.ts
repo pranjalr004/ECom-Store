@@ -8,7 +8,7 @@ let apiClient:ApiClientType=null
 
 async function setupApiClient() : Promise<ReturnType<typeof defineOneEntry>> {
     const apiUrl=process.env.ONEENTRY_PROJECT_URL;
-
+    console.log({apiUrl, token:process.env.ONEENTRY_TOKEN})
     if(!apiUrl){
         throw new Error("ONEENTRY_PROJECT_URL env var is missing")
     }
